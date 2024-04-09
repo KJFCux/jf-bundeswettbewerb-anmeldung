@@ -207,19 +207,19 @@ if ($_COOKIE['invalid']) {
                 <label for="Feuerwehr">Jugendfeuerwehr:</label>
                 <input type="text" class="form-control" name="Gruppe[Feuerwehr]" id="Feuerwehr"
                        placeholder="Musterdorf"
-                       value="<?php echo_if_isset($XmlData['Feuerwehr']); ?>" <?php echo_if_isset($XmlData['Feuerwehr'], 'readonly'); ?>>
+                       value="<?php echo_if_isset($XmlData['Feuerwehr']); ?>" required <?php echo_if_isset($XmlData['Feuerwehr'], 'readonly'); ?>>
             </div>
             <div class="col-sm-4">
                 <label for="GruppenName">Gruppenname:</label>
                 <input type="text" class="form-control" name="Gruppe[GruppenName]" id="GruppenName"
                        placeholder="Musterdorf Blau"
-                       value="<?php echo_if_isset($XmlData['GruppenName']); ?>" <?php echo_if_isset($XmlData['Feuerwehr'], 'readonly'); ?>>
+                       value="<?php echo_if_isset($XmlData['GruppenName']); ?>" required <?php echo_if_isset($XmlData['Feuerwehr'], 'readonly'); ?>>
             </div>
             <div class="col-sm-4">
                 <label for="Organisationseinheit">Stadt, - Gemeinde:</label>
                 <input type="text" class="form-control" name="Gruppe[Organisationseinheit]" id="Organisationseinheit"
                        placeholder="Mustergemeinde"
-                       value="<?php echo_if_isset($XmlData['Organisationseinheit']); ?>" <?php echo_if_isset($XmlData['Feuerwehr'], 'readonly'); ?>>
+                       value="<?php echo_if_isset($XmlData['Organisationseinheit']); ?>" required <?php echo_if_isset($XmlData['Feuerwehr'], 'readonly'); ?>>
             </div>
         </div>
         <div class="row mb-4">
