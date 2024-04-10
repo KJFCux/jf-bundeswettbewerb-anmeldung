@@ -1,10 +1,19 @@
+function getEventDate(eventDate){
+    let dateParts = eventDate.split('.');
+    let day = parseInt(dateParts[0]);
+    let month = parseInt(dateParts[1]) - 1;
+    let year = parseInt(dateParts[2]);
+
+    return new Date(year, month, day);
+}
+
 $(document).ready(function () {
     const validationMessage = $('#age-validation-message')
     const birthday = $('.Geburtsdatum')
     const average = $('.average')
     const totalAge = $('#total-age');
     const totalAverage = $('#average');
-    const currentYear = parseInt($('#currentyear').text());
+    const eventDate =  getEventDate($('#eventdate').text());
 
     function validate() {
         // Date validation
@@ -59,9 +68,15 @@ $(document).ready(function () {
             return;
         }
         let dateParts = inputDate.split('.');
+        let day = parseInt(dateParts[0]);
+        let month = parseInt(dateParts[1]) - 1;
         let year = parseInt(dateParts[2]);
 
-        let age = currentYear - year;
+        //Mindestalter 10 Jahre
+        let allowage = new Date(year + 10, month, day);
+
+        let age = eventDate.getFullYear() - year;
+
         element.closest('tr').find('td:last').text(age);
 
         if (age < 10 || age > 18) {
@@ -69,5 +84,13 @@ $(document).ready(function () {
             validationMessage.text('Das Alter muss zwischen 10 und 18 Jahren liegen.');
             return;
         }
+
+        if (age === 10 && eventDate < allowage) {
+            element.addClass('error');
+            validationMessage.text('Das Mindestalter beträgt 10 Jahre');
+            return;
+        }
+
+
     }
 });
