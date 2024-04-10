@@ -144,7 +144,7 @@ if (isset($_POST['Gruppe']["Feuerwehr"]) && isset($_POST['Gruppe']["GruppenName"
     $xml->formatOutput = true;
     $xml->save('./xml/' . $datafile . '.xml');
 
-    if (isset($_POST['Email'])) {
+    if (isset($_POST['Email']) && $_POST['Email'] != '') {
         $message = 'Hallo, du kannst deine Anmeldung unter dieser URL einsehen: ' . "\r\n" . "\r\n" .
             $config['url'] . '?anmeldung=' . $datafile . "\r\n" . "\r\n" . 'Viele Grüße';
         $header = 'From: ' . $config['mailabsender'] . "\r\n" .
