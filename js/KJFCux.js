@@ -7,19 +7,24 @@ function getEventDate(eventDate){
     return new Date(year, month, day);
 }
 
-$(document).ready(function () {
-    const validationMessage = $('#age-validation-message')
-    const birthday = $('.Geburtsdatum')
-    const average = $('.average')
-    const totalAge = $('#total-age');
-    const totalAverage = $('#average');
-    const eventDate =  getEventDate($('#eventdate').text());
+let tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+let tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+    return new bootstrap.Tooltip(tooltipTriggerEl)
+})
+
+document.addEventListener('DOMContentLoaded', function() {
+    const validationMessage = document.querySelector('#age-validation-message');
+    const birthday = Array.from(document.querySelectorAll('.Geburtsdatum'));
+    const average = Array.from(document.querySelectorAll('.average'));
+    const totalAge = document.querySelector('#total-age');
+    const totalAverage = document.querySelector('#average');
+    const eventDate = getEventDate(document.querySelector('#eventdate').textContent);
 
     function validate() {
         // Date validation
-        validationMessage.text('');
-        birthday.each(function () {
-            calculateAgeForRow($(this));
+        validationMessage.textContent = '';
+        birthday.forEach(function (element) {
+            calculateAgeForRow(element);
         });
         calculateTotalAge();
     }
@@ -27,15 +32,17 @@ $(document).ready(function () {
     validate();
 
     // Date validation
-    birthday.change(function () {
-        validate();
+    birthday.forEach(function (element) {
+        element.addEventListener('change', function () {
+            validate();
+        });
     });
 
-    $('#form').submit(function (event) {
+    document.querySelector('#form').addEventListener('submit', function (event) {
         validate();
-        if (validationMessage.text() !== '') {
-            alert(validationMessage.text());
-            return false;
+        if (validationMessage.textContent !== '') {
+            alert(validationMessage.textContent);
+            event.preventDefault();
         }
     });
 
@@ -43,28 +50,28 @@ $(document).ready(function () {
         // Update total age
         let age = 0;
         let count = 0;
-        average.each(function () {
-            if ($(this).text() !== "") {
+        average.forEach(function (element) {
+            if (element.textContent !== "") {
                 count++;
-                age += Number($(this).text());
+                age += Number(element.textContent);
             }
         });
 
         if (count !== 0) {
-            totalAge.text(age);
-            totalAverage.text(Math.floor(age / count));
+            totalAge.textContent = age;
+            totalAverage.textContent = Math.floor(age / count);
         }
 
     }
 
     function calculateAgeForRow(element) {
-        element.removeClass('error');
-        let inputDate = element.val();
+        element.classList.remove('error');
+        let inputDate = element.value;
         if (inputDate === '') return;
         let dateRegex = /^(0?[1-9]|[12][0-9]|3[01])[.](0?[1-9]|1[012])[.]((19|20)\d\d)$/;
         if (!dateRegex.test(inputDate)) {
-            element.addClass('error');
-            validationMessage.text('Bitte geben Sie ein gültiges Geburtsdatum im Format DD.MM.YYYY ein.');
+            element.classList.add('error');
+            validationMessage.textContent = 'Bitte geben Sie ein gültiges Geburtsdatum im Format DD.MM.YYYY ein.';
             return;
         }
         let dateParts = inputDate.split('.');
@@ -77,17 +84,17 @@ $(document).ready(function () {
 
         let age = eventDate.getFullYear() - year;
 
-        element.closest('tr').find('td:last').text(age);
+        element.closest('tr').querySelector('td:last-child').textContent = age;
 
         if (age < 10 || age > 18) {
-            element.addClass('error');
-            validationMessage.text('Das Alter muss zwischen 10 und 18 Jahren liegen.');
+            element.classList.add('error');
+            validationMessage.textContent = 'Das Alter muss zwischen 10 und 18 Jahren liegen.';
             return;
         }
 
         if (age === 10 && eventDate < allowage) {
-            element.addClass('error');
-            validationMessage.text('Das Mindestalter beträgt 10 Jahre');
+            element.classList.add('error');
+            validationMessage.textContent = 'Das Mindestalter beträgt 10 Jahre';
             return;
         }
 

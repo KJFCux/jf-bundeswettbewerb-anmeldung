@@ -1,0 +1,24 @@
+FcgidWrapper "/home/httpd/cgi-bin/php82-fcgi-starter.fcgi" .php
+
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/plain
+    AddOutputFilterByType DEFLATE text/html
+    AddOutputFilterByType DEFLATE text/css
+    AddOutputFilterByType DEFLATE application/javascript
+</IfModule>
+
+<IfModule mod_headers.c>
+	Header set X-XSS-Protection "1; mode=block"
+	Header set X-Frame-Options "SAMEORIGIN"
+	Header set X-Content-Type-Options "nosniff"
+	Header set Content-Security-Policy "default-src 'self'"
+</IfModule>
+
+<IfModule mod_expires.c>
+    ExpiresActive on
+    ExpiresByType image/png "access plus 1 day"
+    ExpiresByType image/jpg "access plus 1 day"
+    ExpiresByType image/jpeg "access plus 1 day"
+    ExpiresByType text/css "access plus 1 day"
+    ExpiresByType application/javascript "access plus 1 day"
+</IfModule>

@@ -178,12 +178,9 @@ if ($_COOKIE['invalid']) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo $config['title']; ?></title>
     <link rel="stylesheet" href="./css/bootstrap.min.css"
-          integrity="sha384-xOolHFLEh07PJGoPkLv1IbcEPTNtaed2xpHsD9ESMhqIYd0nLMwNLD69Npy4HI+N">
-    <style>
-        .error {
-            border-color: #dc3545 !important;
-        }
-    </style>
+          integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3">
+    <link rel="stylesheet" href="./css/KJFCux.css"
+          integrity="sha384-kaAUel3H6kKKPYdBC/nGbmNK+i8Lwjt6uMsTNSg8/4IwjVLdajX3q5OKhXRlY+xP">
 </head>
 <body>
 <div class="container">
@@ -245,7 +242,9 @@ if ($_COOKIE['invalid']) {
             </div>
             <div class="col-sm-3">
                 <label for="Email">E-Mail (optional):</label>
-                <input type="text" class="form-control" name="Email" id="Email" placeholder="Email@anbieter.de">
+                <input type="text" class="form-control" name="Email" id="Email" placeholder="Email@anbieter.de"
+                       data-bs-toggle="tooltip" data-bs-placement="right"
+                       title="Wir senden dir einmalig einen Link zu dieser Anmeldung, damit du sie später ändern kannst. Deine E-Mail Adresse wird nicht gespeichert.">
             </div>
         </div>
         <div class="row mb-4">
@@ -333,7 +332,7 @@ if ($_COOKIE['invalid']) {
         <div class="row">
             <div class="col-sm">
                 <p>Gesamtalter: <span id="total-age">0</span>, : 9 = <span id="average">0</span></p>
-                <p>Die Berechnung der Alters erfolgt anhand des Geburtsjahrgangs</p>
+                <p>Die Berechnung der Alter erfolgt anhand des Geburtsjahrgangs</p>
             </div>
             <div class="col-sm text-center">
                 <button class="btn btn-primary" type="submit">Anmeldung übermitteln</button>
@@ -342,10 +341,10 @@ if ($_COOKIE['invalid']) {
     </form>
     <span id="eventdate" hidden><?php echo $config['eventdate']; ?></span>
 </div>
-<script src="./js/jquery-3.7.1.slim.min.js" integrity="sha256-kmHvs0B+OpCW5GVHUNjv9rOmY0IvSIRcf7zGUDTDQM8="></script>
 <script src="./js/bootstrap.bundle.min.js"
-        integrity="sha384-Fy6S3B9q64WdZWQUiU+q4/2Lc9npb8tCaSX9FK7E8HnRr0Jz8D6OP9dO5Vg3Q9ct"></script>
-<script src="./js/KJFCux.js" integrity="sha384-eBEdklIAy7XgUuK0iDoYNzFFD1zDGL8w+uyhodf3MIjDHr63L/rESUGRdObruuPK"></script>
+        integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p"></script>
+<script src="./js/KJFCux.js"
+        integrity="sha384-b0eo24gIHBYZEv8GxqfD1SHftxTj5DBSyJ9u0YHD+LDm1gm/FJZ/6G+dg3G5cTGH"></script>
 </body>
 </html>
 
