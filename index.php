@@ -344,7 +344,7 @@ if ($_COOKIE['invalid']) {
 <script src="./js/bootstrap.bundle.min.js"
         integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p"></script>
 <script src="./js/KJFCux.js"
-        integrity="sha384-b0eo24gIHBYZEv8GxqfD1SHftxTj5DBSyJ9u0YHD+LDm1gm/FJZ/6G+dg3G5cTGH"></script>
+        integrity="sha384-UZYI/aoZuFp8Yh04824LJvbJwm2CXVtEPoYzn8e4/dHcTU0IsVvChfsr8Q/qr1bu"></script>
 </body>
 </html>
 

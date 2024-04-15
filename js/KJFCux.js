@@ -59,7 +59,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (count !== 0) {
             totalAge.textContent = age;
-            totalAverage.textContent = Math.floor(age / count);
+            totalAverage.textContent = Math.floor(age / count).toString();
         }
 
     }
@@ -74,15 +74,11 @@ document.addEventListener('DOMContentLoaded', function() {
             validationMessage.textContent = 'Bitte geben Sie ein gültiges Geburtsdatum im Format DD.MM.YYYY ein.';
             return;
         }
-        let dateParts = inputDate.split('.');
-        let day = parseInt(dateParts[0]);
-        let month = parseInt(dateParts[1]) - 1;
-        let year = parseInt(dateParts[2]);
 
         //Mindestalter 10 Jahre
-        let allowage = new Date(year + 10, month, day);
+        let allowAge = getEventDate(inputDate);
 
-        let age = eventDate.getFullYear() - year;
+        let age = eventDate.getFullYear() - allowAge.getFullYear();
 
         element.closest('tr').querySelector('td:last-child').textContent = age;
 
@@ -92,12 +88,10 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        if (age === 10 && eventDate < allowage) {
+        if (age === 10 && eventDate < allowAge) {
             element.classList.add('error');
             validationMessage.textContent = 'Das Mindestalter beträgt 10 Jahre';
             return;
         }
-
-
     }
 });
