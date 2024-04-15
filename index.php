@@ -55,7 +55,7 @@ if (isset($_GET['anmeldung']) && ctype_alnum($_GET['anmeldung']) && file_exists(
     }
 }
 
-if (isset($_POST['Gruppe']["Feuerwehr"]) && isset($_POST['Gruppe']["GruppenName"]) && isset($_POST['Persons']) && isset($_POST['Persons']['Vorname']) && isset($_POST['Persons']['Nachname']) && isset($_POST['Persons']['Geburtsdatum'])) {
+if (isset($_POST['Gruppe']['Feuerwehr']) && isset($_POST['Gruppe']['GruppenName']) && isset($_POST['Persons']['Vorname']) && isset($_POST['Persons']['Nachname']) && isset($_POST['Persons']['Geburtsdatum'])) {
 
     // XML-Daten aufbauen
     $xml = new DOMDocument("1.0", "utf-16");
