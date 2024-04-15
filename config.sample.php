@@ -9,4 +9,4 @@ $config['organizationalunits'] = ['Beverstedt', 'Börde Lamstedt', 'Cuxhaven', '
 $config['eventdate'] = '01.06.2024';
 $config['mailabsender'] = 'mail@example.net';
 $config['url'] = 'https://example.net/anmeldung/';
-$config['mailmessage'] = "Hallo, du kannst deine Anmeldung unter dieser URL einsehen: \r\n\r\n {URL} \r\n\r\n Viele Grüße";
+$config['mailmessage'] = "Hallo, du kannst deine Anmeldung unter dieser URL einsehen: \r\n\r\n{URL} \r\n\r\nViele Grüße";
