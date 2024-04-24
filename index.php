@@ -180,7 +180,7 @@ if ($_COOKIE['invalid']) {
     <link rel="stylesheet" href="./css/bootstrap.min.css"
           integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3">
     <link rel="stylesheet" href="./css/KJFCux.css"
-          integrity="sha384-kaAUel3H6kKKPYdBC/nGbmNK+i8Lwjt6uMsTNSg8/4IwjVLdajX3q5OKhXRlY+xP">
+          integrity="sha384-O+mnne/csN6seug8TlJ6t1LftNZ+QCWqXGLN0VdX4dP5JRvlVj35NVpvE0jhjoMn">
 </head>
 <body>
 <div class="container">
@@ -344,7 +344,7 @@ if ($_COOKIE['invalid']) {
 <script src="./js/bootstrap.bundle.min.js"
         integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p"></script>
 <script src="./js/KJFCux.js"
-        integrity="sha384-UZYI/aoZuFp8Yh04824LJvbJwm2CXVtEPoYzn8e4/dHcTU0IsVvChfsr8Q/qr1bu"></script>
+        integrity="sha384-TySIbNVN6/avo+WZBhYItbYas793CElyMzHMIspo8qjyT7uEBdajybAueggOFitv"></script>
 </body>
 </html>
 
