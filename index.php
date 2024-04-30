@@ -331,7 +331,7 @@ if ($_COOKIE['invalid']) {
         </div>
         <div class="row">
             <div class="col-sm">
-                <p>Gesamtalter: <span id="total-age">0</span>, : 9 = <span id="average">0</span></p>
+                <p>Gesamtalter: <span id="total-age">0</span> : 9 = <span id="average">0</span></p>
                 <p>Die Berechnung der Alter erfolgt anhand des Geburtsjahrgangs</p>
             </div>
             <div class="col-sm text-center">
@@ -344,7 +344,7 @@ if ($_COOKIE['invalid']) {
 <script src="./js/bootstrap.bundle.min.js"
         integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p"></script>
 <script src="./js/KJFCux.js"
-        integrity="sha384-TySIbNVN6/avo+WZBhYItbYas793CElyMzHMIspo8qjyT7uEBdajybAueggOFitv"></script>
+        integrity="sha384-QbaHC+Eb61iElgkVWOguJB/AYCo+3+V9lIYoKmNiXWJti84T4XMJ30tBgNRlDeGs"></script>
 </body>
 </html>
 

@@ -1,4 +1,4 @@
-function getEventDate(eventDate){
+function getEventDate(eventDate) {
     let dateParts = eventDate.split('.');
     let day = parseInt(dateParts[0]);
     let month = parseInt(dateParts[1]) - 1;
@@ -12,7 +12,7 @@ let tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
     return new bootstrap.Tooltip(tooltipTriggerEl)
 })
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     const validationMessage = document.querySelector('#age-validation-message');
     const birthday = Array.from(document.querySelectorAll('.Geburtsdatum'));
     const average = Array.from(document.querySelectorAll('.average'));
@@ -59,7 +59,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (count !== 0) {
             totalAge.textContent = age;
-            totalAverage.textContent = Math.floor(age / count).toString();
+            totalAverage.textContent = (Math.round(age * 100 / count) / 100).toString();
         }
 
     }
@@ -76,9 +76,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         //Mindestalter 10 Jahre
-        let allowAge = getEventDate(inputDate);
+        let participantAge = getEventDate(inputDate);
 
-        let age = eventDate.getFullYear() - allowAge.getFullYear();
+        let age = eventDate.getFullYear() - participantAge.getFullYear();
 
         element.closest('tr').querySelector('td:last-child').textContent = age;
 
@@ -87,8 +87,7 @@ document.addEventListener('DOMContentLoaded', function() {
             validationMessage.textContent = 'Das Alter muss zwischen 10 und 18 Jahren liegen.';
             return;
         }
-
-        if (age === 10 && eventDate < allowAge) {
+        if (age === 10 && eventDate < participantAge.setFullYear(participantAge.getFullYear() + 10)) {
             element.classList.add('error');
             validationMessage.textContent = 'Das Mindestalter beträgt 10 Jahre';
             return;
