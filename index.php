@@ -77,6 +77,9 @@ if (isset($_POST['Gruppe']['Feuerwehr']) && isset($_POST['Gruppe']['GruppenName'
         }
         $organisationseinheit = $xml->createElement("Organisationseinheit", mb_strimwidth(($_POST["Gruppe"]["Organisationseinheit"]), 0, 64));
         $gruppe->appendChild($organisationseinheit);
+
+        $timeStampAnmeldung = $xml->createElement("TimeStampAnmeldung", (new DateTime())->format("Y-m-d\TH:i:s"));
+        $gruppe->appendChild($timeStampAnmeldung);
     } else {
         // Feuerwehr, GruppenName, Organisationseinheit
         $feuerwehr = $xml->createElement("Feuerwehr", $XmlData['Feuerwehr']);
@@ -87,6 +90,9 @@ if (isset($_POST['Gruppe']['Feuerwehr']) && isset($_POST['Gruppe']['GruppenName'
 
         $organisationseinheit = $xml->createElement("Organisationseinheit", $XmlData["Organisationseinheit"]);
         $gruppe->appendChild($organisationseinheit);
+
+        $timeStampAnmeldung = $xml->createElement("TimeStampAnmeldung", $XmlData["TimeStampAnmeldung"]);
+        $gruppe->appendChild($timeStampAnmeldung);
     }
 
     // Persons-Element erstellen
@@ -133,7 +139,6 @@ if (isset($_POST['Gruppe']['Feuerwehr']) && isset($_POST['Gruppe']['GruppenName'
             setcookie("invalid", true);
         }
         $geburtsdatum = $xml->createElement("Geburtsdatum", $date->format("Y-m-d\TH:i:s"));
-
         $person->appendChild($geburtsdatum);
     }
 
@@ -141,11 +146,18 @@ if (isset($_POST['Gruppe']['Feuerwehr']) && isset($_POST['Gruppe']['GruppenName'
     if ($datafile === null) {
         $datafile = generateRandomString(48);
     }
+    $url = $config['url'] . '?anmeldung=' . $datafile;
+
+    $urlderAnmeldung = $xml->createElement("UrlderAnmeldung", $url);
+    $gruppe->appendChild($urlderAnmeldung);
+
+    $timeStampAenderung = $xml->createElement("TimeStampAenderung", (new DateTime())->format("Y-m-d\TH:i:s"));
+    $gruppe->appendChild($timeStampAenderung);
+
     $xml->formatOutput = true;
     $xml->save('./xml/' . $datafile . '.xml');
 
     if (isset($_POST['Email']) && $_POST['Email'] != '') {
-        $url = $config['url'] . '?anmeldung=' . $datafile;
         $message = str_replace('{URL}', $url, $config['mailmessage']);
         $header = 'From: ' . $config['mailabsender'] . "\r\n" . 'Content-Type: text/plain; charset=utf-8' . "\r\n" .
             'X-Mailer: PHP/' . phpversion();
