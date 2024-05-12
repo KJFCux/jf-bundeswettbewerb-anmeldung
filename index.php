@@ -344,7 +344,7 @@ if ($_COOKIE['invalid']) {
         <div class="row">
             <div class="col-sm">
                 <p>Gesamtalter: <span id="total-age">0</span> : 9 = <span id="average">0</span></p>
-                <p>Die Berechnung der Alter erfolgt anhand des Geburtsjahrgangs</p>
+                <p>Die Berechnung der Alter erfolgt anhand des Geburtsjahrgangs.</p>
             </div>
             <div class="col-sm text-center">
                 <button class="btn btn-primary" type="submit">Anmeldung übermitteln</button>
