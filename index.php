@@ -66,16 +66,16 @@ if (isset($_POST['Gruppe']['Feuerwehr']) && isset($_POST['Gruppe']['GruppenName'
 
     if ($old_xml === null) {
         // Feuerwehr, GruppenName, Organisationseinheit
-        $feuerwehr = $xml->createElement("Feuerwehr", mb_strimwidth(($_POST["Gruppe"]["Feuerwehr"]), 0, 64));
+        $feuerwehr = $xml->createElement("Feuerwehr", mb_strimwidth(trim($_POST["Gruppe"]["Feuerwehr"]), 0, 64));
         $gruppe->appendChild($feuerwehr);
 
-        $gruppenName = $xml->createElement("GruppenName", mb_strimwidth(($_POST["Gruppe"]["GruppenName"]), 0, 64));
+        $gruppenName = $xml->createElement("GruppenName", mb_strimwidth(trim($_POST["Gruppe"]["GruppenName"]), 0, 64));
         $gruppe->appendChild($gruppenName);
 
         if (!isset($_POST['Gruppe']["Organisationseinheit"])) {
             $_POST['Gruppe']["Organisationseinheit"] = '';
         }
-        $organisationseinheit = $xml->createElement("Organisationseinheit", mb_strimwidth(($_POST["Gruppe"]["Organisationseinheit"]), 0, 64));
+        $organisationseinheit = $xml->createElement("Organisationseinheit", mb_strimwidth(trim($_POST["Gruppe"]["Organisationseinheit"]), 0, 64));
         $gruppe->appendChild($organisationseinheit);
 
         $timeStampAnmeldung = $xml->createElement("TimeStampAnmeldung", (new DateTime())->format("Y-m-d\TH:i:s"));
@@ -122,11 +122,11 @@ if (isset($_POST['Gruppe']['Feuerwehr']) && isset($_POST['Gruppe']['GruppenName'
         $person = $xml->createElement("Person");
         $persons->appendChild($person);
 
-        $person->appendChild($xml->createElement("Vorname", mb_strimwidth(($vorname), 0, 64)));
+        $person->appendChild($xml->createElement("Vorname", mb_strimwidth(trim($vorname), 0, 64)));
 
-        $person->appendChild($xml->createElement("Nachname", mb_strimwidth(($nachname), 0, 64)));
+        $person->appendChild($xml->createElement("Nachname", mb_strimwidth(trim($nachname), 0, 64)));
 
-        $person->appendChild($xml->createElement("Geschlecht", mb_strimwidth(($geschlecht), 0, 1)));
+        $person->appendChild($xml->createElement("Geschlecht", mb_strimwidth(trim($geschlecht), 0, 1)));
 
         $date = false;
         if (isset($_POST["Persons"]["Geburtsdatum"][$index])) {
@@ -161,7 +161,7 @@ if (isset($_POST['Gruppe']['Feuerwehr']) && isset($_POST['Gruppe']['GruppenName'
         $message = str_replace('{URL}', $url, $config['mailmessage']);
         $header = 'From: ' . $config['mailabsender'] . "\r\n" . 'Content-Type: text/plain; charset=utf-8' . "\r\n" .
             'X-Mailer: PHP/' . phpversion();
-        mail($_POST['Email'], 'Anmeldung zum ' . $config['description'], $message, $header);
+        mail(trim($_POST['Email']), 'Anmeldung zum ' . $config['description'], $message, $header);
     }
 
 
