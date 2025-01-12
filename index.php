@@ -171,11 +171,11 @@ if (isset($_POST['Gruppe']['Feuerwehr']) && isset($_POST['Gruppe']['GruppenName'
 }
 $saved = false;
 $invalid = false;
-if ($_COOKIE['saved']) {
+if (isset($_COOKIE['saved']) && $_COOKIE['saved']) {
     $saved = true;
     setcookie("saved", false, time() - 1000);
 }
-if ($_COOKIE['invalid']) {
+if (isset($_COOKIE['invalid']) && $_COOKIE['invalid']) {
     $invalid = true;
     setcookie("invalid", false, time() - 1000);
 }
