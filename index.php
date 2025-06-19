@@ -25,7 +25,7 @@ function generateRandomString($length = 10): string
 
 function echo_if_isset($foo, $echo = null): void
 {
-    if (isset($foo)) {
+    if (isset($foo) && !is_array($foo)) {
         if ($echo === null) {
             echo htmlspecialchars($foo);
         } else {
