@@ -7,6 +7,7 @@ $config['description'] = 'Kreisjugendfeuerwehrtag am Samstag, den 01.06.2024 in 
 $config['organizationalunit'] = 'Stadt, - Gemeinde';
 $config['organizationalunits'] = ['Beverstedt', 'Börde Lamstedt', 'Cuxhaven', 'Geestland', 'Land Hadeln', 'Hagen', 'Hemmoor', 'Loxstedt', 'Schiffdorf', 'Wurster Nordseeküste'];
 $config['eventdate'] = '01.06.2024';
+$config['block_registration_at'] = '2025-05-17T06:00:00+02:00';
 $config['mailabsender'] = 'mail@example.net';
 $config['url'] = 'https://example.net/anmeldung/';
 $config['mailmessage'] = "Hallo, du kannst deine Anmeldung unter dieser URL einsehen: \r\n\r\n{URL} \r\n\r\nViele Grüße";

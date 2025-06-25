@@ -10,7 +10,20 @@ if (file_exists('config.php')) {
 }
 
 $eventDate = DateTimeImmutable::createFromFormat("d.m.Y  H:i:s", $config['eventdate'] . ' 00:00:00');
+
 $allowDate = $eventDate->modify('-10 year');
+
+$registrationEnabled = true;
+try {
+    $blockRegistrationAt = new DateTimeImmutable($config['block_registration_at']);
+    $registrationEnabled = $blockRegistrationAt > new DateTimeImmutable();
+    // If the registration is blocked and the form is submitted, show an error message
+    if (!$registrationEnabled && !empty($_POST)) {
+        die('Anmeldung ist nicht mehr möglich. Der Anmeldeschluss war am ' . $blockRegistrationAt->format('d.m.Y H:i:s') . '.');
+    }
+} catch (Exception $e) {
+    die('block_registration_at in config.php is not a valid date');
+}
 
 function generateRandomString($length = 10): string
 {
@@ -46,12 +59,16 @@ function if_isset_dt($foo): string
 $XmlData = [];
 $datafile = null;
 $old_xml = null;
+$result_xlsx = null;
 if (isset($_GET['anmeldung']) && ctype_alnum($_GET['anmeldung']) && file_exists('./xml/' . $_GET['anmeldung'] . '.xml')) {
     $old_xml = simplexml_load_file('./xml/' . $_GET['anmeldung'] . '.xml');
     if ($old_xml) {
         //Convert SimpleXml Object to associative Array
         $XmlData = json_decode(json_encode($old_xml), TRUE);
         $datafile = $_GET['anmeldung'];
+    }
+    if(file_exists('./xml/Wertungsbögen/' . $_GET['anmeldung'] . '.xlsx')){
+        $result_xlsx = './xml/Wertungsbögen/' . $_GET['anmeldung'] . '.xlsx';
     }
 }
 
@@ -226,6 +243,15 @@ if (isset($_COOKIE['invalid']) && $_COOKIE['invalid']) {
         </div>
         <?php
     }
+    if(isset($result_xlsx) && file_exists($result_xlsx)) {
+        ?>
+        <div class="card text-white bg-success mb-4">
+            <div class="card-body">
+                <a href="<?php echo $result_xlsx; ?>" class="text-white">Hier kannst du den Wertungsbogen herunterladen.</a>
+            </div>
+        </div>
+        <?php
+    }
     ?>
     <form method="POST" id="form">
         <div class="row mb-4">
@@ -346,9 +372,11 @@ if (isset($_COOKIE['invalid']) && $_COOKIE['invalid']) {
                 <p>Gesamtalter: <span id="total-age">0</span> : 9 = <span id="average">0</span></p>
                 <p>Die Berechnung der Alter erfolgt anhand des Geburtsjahrgangs.</p>
             </div>
+            <?php if($registrationEnabled){ ?>
             <div class="col-sm text-center">
                 <button class="btn btn-primary" type="submit">Anmeldung übermitteln</button>
             </div>
+            <?php } ?>
         </div>
     </form>
     <span id="eventdate" hidden><?php echo $config['eventdate']; ?></span>
