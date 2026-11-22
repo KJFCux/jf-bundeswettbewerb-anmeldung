@@ -1,0 +1,10 @@
+# Die Anmeldedaten und Wertungsbögen enthalten personenbezogene Daten und dürfen
+# nicht direkt über den Webserver abrufbar sein. PHP liest die Dateien weiterhin
+# über das Dateisystem (Wertungsbögen werden über index.php ausgeliefert).
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>

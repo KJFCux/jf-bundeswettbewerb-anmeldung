@@ -78,3 +78,6 @@ fabric.properties
 
 
 config.php
+# Anmeldedaten und Wertungsbögen (personenbezogene Daten) niemals committen
+xml/*.xml
+xml/Wertungsbögen/

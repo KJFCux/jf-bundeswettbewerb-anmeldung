@@ -6,10 +6,12 @@
 </IfModule>
 
 <IfModule mod_headers.c>
-	Header set X-XSS-Protection "1; mode=block"
 	Header set X-Frame-Options "SAMEORIGIN"
 	Header set X-Content-Type-Options "nosniff"
-	Header set Content-Security-Policy "default-src 'self'"
+	Header set Content-Security-Policy "default-src 'self'; img-src 'self' data:; frame-ancestors 'self'; form-action 'self'; base-uri 'self'"
+	# Anmelde-Links enthalten den Zugangsschlüssel: nicht weitergeben und nicht indexieren
+	Header set Referrer-Policy "no-referrer"
+	Header set X-Robots-Tag "noindex, nofollow"
 </IfModule>
 
 <IfModule mod_expires.c>
@@ -19,4 +21,9 @@
     ExpiresByType image/jpeg "access plus 1 day"
     ExpiresByType text/css "access plus 1 day"
     ExpiresByType application/javascript "access plus 1 day"
+</IfModule>
+
+# Versteckte Verzeichnisse/Dateien (.git, .idea, .htaccess) nicht ausliefern
+<IfModule mod_alias.c>
+    RedirectMatch 404 "/\.(git|idea|htaccess|gitignore)"
 </IfModule>
