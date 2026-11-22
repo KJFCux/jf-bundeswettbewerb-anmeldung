@@ -8,10 +8,32 @@ if (file_exists('config.php')) {
 } else {
     die('Config not found, please copy config.sample.php to config.php and configure values');
 }
+require __DIR__ . '/inc/functions.php';
 
-$eventDate = DateTimeImmutable::createFromFormat("d.m.Y  H:i:s", $config['eventdate'] . ' 00:00:00');
+// Erlaubte Werte für das Geschlecht
+const GESCHLECHT_OPTIONEN = ['D', 'M', 'W'];
+// Anzahl der Zeilen im Meldebogen: 9 Teilnehmende + 1 Ersatz
+const ANZAHL_TEILNEHMENDE = 9;
+const ANZAHL_ZEILEN = ANZAHL_TEILNEHMENDE + 1;
+// Mindest- und Höchstalter (berechnet über den Geburtsjahrgang)
+const MINDESTALTER = 10;
+const HOECHSTALTER = 18;
+// Ablageorte (alle unterhalb von xml/, das per .htaccess gesperrt ist)
+const XML_DIR = __DIR__ . '/xml/';
+const VERLAUF_DIR = XML_DIR . 'Verlauf/';
+const WERTUNGSBOGEN_DIR = XML_DIR . 'Wertungsbögen/';
+const RATELIMIT_DIR = XML_DIR . '.ratelimit';
+// Markierung für ungültige Geburtsdaten (DateTime.MinValue in C#)
+const UNGUELTIGES_DATUM = '0001-01-01';
 
-$allowDate = $eventDate->modify('-10 year');
+$eventDate = DateTimeImmutable::createFromFormat('!d.m.Y', $config['eventdate']);
+if ($eventDate === false) {
+    die('eventdate in config.php is not a valid date (expected format: TT.MM.JJJJ)');
+}
+// Wer nach diesem Tag geboren ist, ist am Veranstaltungstag jünger als das Mindestalter
+$allowDate = $eventDate->modify('-' . MINDESTALTER . ' year');
+// Ältester erlaubter Jahrgang
+$minDate = $eventDate->setDate((int)$eventDate->format('Y') - HOECHSTALTER, 1, 1);
 
 $registrationEnabled = true;
 try {
@@ -25,54 +47,79 @@ try {
     die('block_registration_at in config.php is not a valid date');
 }
 
-function generateRandomString($length = 10): string
+/**
+ * Wandelt ein Geburtsdatum aus dem Formular in ein Datum um.
+ * Akzeptiert JJJJ-MM-TT (Datumsfeld) und TT.MM.JJJJ (ältere Browser).
+ */
+function parseGeburtsdatum(string $value): ?DateTime
 {
-    $characters = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    $charactersLength = strlen($characters);
-    $randomString = '';
-    for ($i = 0; $i < $length; $i++) {
-        $randomString .= $characters[random_int(0, $charactersLength - 1)];
+    foreach (['!Y-m-d', '!d.m.Y'] as $format) {
+        $date = DateTime::createFromFormat($format, $value);
+        $errors = DateTime::getLastErrors();
+        if ($date !== false && empty($errors['warning_count']) && empty($errors['error_count'])) {
+            return $date;
+        }
     }
-    return $randomString;
+    return null;
 }
 
-function echo_if_isset($foo, $echo = null): void
+function if_isset_dt($array, $key): string
 {
-    if (isset($foo) && !is_array($foo)) {
-        if ($echo === null) {
-            echo htmlspecialchars($foo);
-        } else {
-            echo $echo;
+    $value = value($array, $key);
+    if ($value === '') {
+        return '';
+    }
+    $timestamp = strtotime($value);
+    return $timestamp === false ? '' : date('Y-m-d', $timestamp);
+}
+
+$XmlData = [];
+$datafile = null;
+$gespeichert = false;
+$wertungsbogen = null;
+if (isset($_GET['anmeldung']) && is_string($_GET['anmeldung']) && ctype_alnum($_GET['anmeldung']) && file_exists(XML_DIR . $_GET['anmeldung'] . '.xml')) {
+    $geladen = loadXmlData(XML_DIR . $_GET['anmeldung'] . '.xml');
+    if ($geladen !== null) {
+        $XmlData = $geladen;
+        $datafile = $_GET['anmeldung'];
+        $gespeichert = true;
+        if (file_exists(WERTUNGSBOGEN_DIR . $datafile . '.xlsx')) {
+            $wertungsbogen = WERTUNGSBOGEN_DIR . $datafile . '.xlsx';
         }
     }
 }
 
-function if_isset_dt($foo): string
-{
-    if (isset($foo)) {
-        return date('d.m.Y', strtotime($foo));
+// Wertungsbogen über PHP ausliefern, damit das Verzeichnis xml/ komplett gesperrt bleiben kann
+if (isset($_GET['wertungsbogen'])) {
+    if ($wertungsbogen === null) {
+        http_response_code(404);
+        die('Kein Wertungsbogen vorhanden.');
     }
-    return '';
+    $filename = trim('Wertungsbogen ' . value($XmlData, 'GruppenName')) . '.xlsx';
+    header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    header("Content-Disposition: attachment; filename=\"Wertungsbogen.xlsx\"; filename*=UTF-8''" . rawurlencode($filename));
+    header('Content-Length: ' . filesize($wertungsbogen));
+    header('Cache-Control: private, no-store');
+    readfile($wertungsbogen);
+    exit;
 }
 
+$personen = asList($XmlData['Persons']['Person'] ?? []);
 
-$XmlData = [];
-$datafile = null;
-$old_xml = null;
-$result_xlsx = null;
-if (isset($_GET['anmeldung']) && ctype_alnum($_GET['anmeldung']) && file_exists('./xml/' . $_GET['anmeldung'] . '.xml')) {
-    $old_xml = simplexml_load_file('./xml/' . $_GET['anmeldung'] . '.xml');
-    if ($old_xml) {
-        //Convert SimpleXml Object to associative Array
-        $XmlData = json_decode(json_encode($old_xml), TRUE);
-        $datafile = $_GET['anmeldung'];
-    }
-    if(file_exists('./xml/Wertungsbögen/' . $_GET['anmeldung'] . '.xlsx')){
-        $result_xlsx = './xml/Wertungsbögen/' . $_GET['anmeldung'] . '.xlsx';
-    }
-}
+if (isset($_POST['Gruppe']['Feuerwehr'], $_POST['Gruppe']['GruppenName'], $_POST['Persons']['Vorname'])
+    && is_array($_POST['Persons']['Vorname'])) {
 
-if (isset($_POST['Gruppe']['Feuerwehr']) && isset($_POST['Gruppe']['GruppenName']) && isset($_POST['Persons']['Vorname']) && isset($_POST['Persons']['Nachname']) && isset($_POST['Persons']['Geburtsdatum'])) {
+    // Spam-Schutz: Das Feld "Homepage" ist für Menschen unsichtbar und wird nur von Bots ausgefüllt.
+    // Der Bot bekommt eine scheinbar erfolgreiche Antwort, gespeichert wird nichts.
+    if (!empty($_POST['Homepage'])) {
+        header('Location: ./');
+        exit;
+    }
+    // Neue Anmeldungen pro IP-Adresse begrenzen
+    if (!$gespeichert && !rateLimit(RATELIMIT_DIR, 'anmeldung', (int)($config['ratelimit_registrations'] ?? 10))) {
+        http_response_code(429);
+        die('Von deinem Anschluss wurden in der letzten Stunde zu viele Anmeldungen angelegt. Bitte versuche es später erneut.');
+    }
 
     // XML-Daten aufbauen
     $xml = new DOMDocument("1.0", "utf-16");
@@ -81,82 +128,59 @@ if (isset($_POST['Gruppe']['Feuerwehr']) && isset($_POST['Gruppe']['GruppenName'
     $gruppe = $xml->createElement("Gruppe");
     $xml->appendChild($gruppe);
 
-    if ($old_xml === null) {
+    if (!$gespeichert) {
         // Feuerwehr, GruppenName, Organisationseinheit
-        $feuerwehr = $xml->createElement("Feuerwehr", mb_strimwidth(trim($_POST["Gruppe"]["Feuerwehr"]), 0, 64));
-        $gruppe->appendChild($feuerwehr);
-
-        $gruppenName = $xml->createElement("GruppenName", mb_strimwidth(trim($_POST["Gruppe"]["GruppenName"]), 0, 64));
-        $gruppe->appendChild($gruppenName);
-
-        if (!isset($_POST['Gruppe']["Organisationseinheit"])) {
-            $_POST['Gruppe']["Organisationseinheit"] = '';
+        $organisationseinheit = input($_POST['Gruppe']['Organisationseinheit'] ?? '');
+        if (!in_array($organisationseinheit, $config['organizationalunits'], true)) {
+            $organisationseinheit = '';
         }
-        $organisationseinheit = $xml->createElement("Organisationseinheit", mb_strimwidth(trim($_POST["Gruppe"]["Organisationseinheit"]), 0, 64));
-        $gruppe->appendChild($organisationseinheit);
-
-        $timeStampAnmeldung = $xml->createElement("TimeStampAnmeldung", (new DateTime())->format("Y-m-d\TH:i:s"));
-        $gruppe->appendChild($timeStampAnmeldung);
+        $gruppe->appendChild(xmlElement($xml, "Feuerwehr", input($_POST["Gruppe"]["Feuerwehr"])));
+        $gruppe->appendChild(xmlElement($xml, "GruppenName", input($_POST["Gruppe"]["GruppenName"])));
+        $gruppe->appendChild(xmlElement($xml, "Organisationseinheit", $organisationseinheit));
+        $gruppe->appendChild(xmlElement($xml, "TimeStampAnmeldung", (new DateTime())->format("Y-m-d\TH:i:s")));
     } else {
-        // Feuerwehr, GruppenName, Organisationseinheit
-        $feuerwehr = $xml->createElement("Feuerwehr", $XmlData['Feuerwehr']);
-        $gruppe->appendChild($feuerwehr);
-
-        $gruppenName = $xml->createElement("GruppenName", $XmlData["GruppenName"]);
-        $gruppe->appendChild($gruppenName);
-
-        $organisationseinheit = $xml->createElement("Organisationseinheit", $XmlData["Organisationseinheit"]);
-        $gruppe->appendChild($organisationseinheit);
-
-        $timeStampAnmeldung = $xml->createElement("TimeStampAnmeldung", $XmlData["TimeStampAnmeldung"]);
-        $gruppe->appendChild($timeStampAnmeldung);
+        // Bei Änderungen bleiben Feuerwehr, GruppenName und Organisationseinheit unverändert
+        foreach (['Feuerwehr', 'GruppenName', 'Organisationseinheit', 'TimeStampAnmeldung'] as $feld) {
+            $gruppe->appendChild(xmlElement($xml, $feld, value($XmlData, $feld)));
+        }
     }
 
     // Persons-Element erstellen
     $persons = $xml->createElement("Persons");
     $gruppe->appendChild($persons);
 
+    $invalid = false;
+    $post = $_POST['Persons'];
 
-    // Personen hinzufügen
-    foreach ($_POST["Persons"]["Vorname"] as $index => $vorname) {
+    // Personen hinzufügen (maximal 9 Teilnehmende + Ersatz)
+    foreach (array_slice($post['Vorname'], 0, ANZAHL_ZEILEN, true) as $index => $vorname) {
+        $vorname = input($vorname);
+        $nachname = input($post['Nachname'][$index] ?? '');
 
-        if (isset($_POST["Persons"]["Nachname"][$index])) {
-            $nachname = $_POST["Persons"]["Nachname"][$index];
-        } else {
-            $nachname = '';
-        }
-        if (isset($_POST["Persons"]["Nachname"][$index])) {
-            $geschlecht = $_POST["Persons"]["Geschlecht"][$index];
-        } else {
-            $geschlecht = 'N';
-        }
-
-        //If Replacement ist empty
-        if ($vorname == '' && $nachname == '') {
+        // Leere Zeilen (z. B. kein Ersatz) überspringen
+        if ($vorname === '' && $nachname === '') {
             continue;
+        }
+
+        $geschlecht = input($post['Geschlecht'][$index] ?? '', 1);
+        if (!in_array($geschlecht, GESCHLECHT_OPTIONEN, true)) {
+            $geschlecht = 'N';
         }
 
         $person = $xml->createElement("Person");
         $persons->appendChild($person);
+        $person->appendChild(xmlElement($xml, "Vorname", $vorname));
+        $person->appendChild(xmlElement($xml, "Nachname", $nachname));
+        $person->appendChild(xmlElement($xml, "Geschlecht", $geschlecht));
 
-        $person->appendChild($xml->createElement("Vorname", mb_strimwidth(trim($vorname), 0, 64)));
-
-        $person->appendChild($xml->createElement("Nachname", mb_strimwidth(trim($nachname), 0, 64)));
-
-        $person->appendChild($xml->createElement("Geschlecht", mb_strimwidth(trim($geschlecht), 0, 1)));
-
-        $date = false;
-        if (isset($_POST["Persons"]["Geburtsdatum"][$index])) {
-            // Geburtsdatum in das Format YYYY-MM-DD konvertieren
-            $date = DateTime::createFromFormat("d.m.Y  H:i:s", $_POST["Persons"]["Geburtsdatum"][$index] . ' 00:00:00');
+        // Geburtsdatum prüfen und in das Format YYYY-MM-DDTHH:MM:SS konvertieren
+        $date = parseGeburtsdatum(input($post['Geburtsdatum'][$index] ?? '', 10));
+        $alter = $date ? (int)$eventDate->format('Y') - (int)$date->format('Y') : null;
+        if (!$date || $allowDate < $date || $alter < MINDESTALTER || $alter > HOECHSTALTER) {
+            $date = new DateTime(UNGUELTIGES_DATUM);
+            $invalid = true;
         }
-        if (!$date || $allowDate < $date
-            || ($eventDate->format('Y') - $date->format('Y')) < 10 || ($eventDate->format('Y') - $date->format('Y')) > 18) {
-            $date = new DateTime("0001-01-01 00:00:00"); //C# min value
-            setcookie("invalid", true);
-        }
-        $geburtsdatum = $xml->createElement("Geburtsdatum", $date->format("Y-m-d\TH:i:s"));
-        $person->appendChild($geburtsdatum);
+        $person->appendChild(xmlElement($xml, "Geburtsdatum", $date->format("Y-m-d\TH:i:s")));
     }
 
     // XML speichern
@@ -165,51 +189,56 @@ if (isset($_POST['Gruppe']['Feuerwehr']) && isset($_POST['Gruppe']['GruppenName'
     }
     $url = $config['url'] . '?anmeldung=' . $datafile;
 
-    $urlderAnmeldung = $xml->createElement("UrlderAnmeldung", $url);
-    $gruppe->appendChild($urlderAnmeldung);
-
-    $timeStampAenderung = $xml->createElement("TimeStampAenderung", (new DateTime())->format("Y-m-d\TH:i:s"));
-    $gruppe->appendChild($timeStampAenderung);
+    $gruppe->appendChild(xmlElement($xml, "UrlderAnmeldung", $url));
+    $gruppe->appendChild(xmlElement($xml, "TimeStampAenderung", (new DateTime())->format("Y-m-d\TH:i:s")));
 
     $xml->formatOutput = true;
-    $xml->save('./xml/' . $datafile . '.xml');
-
-    if (isset($_POST['Email']) && $_POST['Email'] != '') {
-        $message = str_replace('{URL}', $url, $config['mailmessage']);
-        $header = 'From: ' . $config['mailabsender'] . "\r\n" . 'Content-Type: text/plain; charset=utf-8' . "\r\n" .
-            'X-Mailer: PHP/' . phpversion();
-        mail(trim($_POST['Email']), 'Anmeldung zum ' . $config['description'], $message, $header);
+    if ($xml->save(XML_DIR . $datafile . '.xml') === false) {
+        http_response_code(500);
+        die('Die Anmeldung konnte nicht gespeichert werden. Bitte wende dich an die Veranstaltungsleitung.');
+    }
+    // Jeden Stand zusätzlich im Verlauf sichern (Unterordner, damit der Import keine Duplikate sieht)
+    if (($config['history'] ?? true) && (is_dir(VERLAUF_DIR) || @mkdir(VERLAUF_DIR, 0770, true))) {
+        $xml->save(VERLAUF_DIR . $datafile . '_' . (new DateTime())->format('Ymd-His-v') . '.xml');
     }
 
+    // Link per E-Mail senden (begrenzt pro IP-Adresse, damit das Formular nicht zum Spam-Versand taugt)
+    $email = trim((string)($_POST['Email'] ?? ''));
+    if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)
+        && rateLimit(RATELIMIT_DIR, 'mail', (int)($config['ratelimit_mails'] ?? 5))) {
+        $message = str_replace('{URL}', $url, $config['mailmessage']);
+        $header = 'From: ' . $config['mailabsender'] . "\r\n" . 'Content-Type: text/plain; charset=utf-8';
+        mail($email, mailSubject('Anmeldung zum ' . strip_tags($config['description'])), $message, $header);
+    }
 
+    setcookie("saved", "1");
+    if ($invalid) {
+        setcookie("invalid", "1");
+    }
     header('Location: ./?anmeldung=' . $datafile);
-    setcookie("saved", true);
     exit;
 }
 $saved = false;
 $invalid = false;
-if (isset($_COOKIE['saved']) && $_COOKIE['saved']) {
+if (!empty($_COOKIE['saved'])) {
     $saved = true;
-    setcookie("saved", false, time() - 1000);
+    setcookie("saved", "", time() - 1000);
 }
-if (isset($_COOKIE['invalid']) && $_COOKIE['invalid']) {
+if (!empty($_COOKIE['invalid'])) {
     $invalid = true;
-    setcookie("invalid", false, time() - 1000);
+    setcookie("invalid", "", time() - 1000);
 }
-
-//Javascript Hash created with: curl https://DOMAIN/js/KJFCux.js | openssl dgst -sha384 -binary | openssl base64 -A
-
 ?>
 <!DOCTYPE html>
 <html lang="de">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
     <title><?php echo $config['title']; ?></title>
     <link rel="stylesheet" href="./css/bootstrap.min.css"
-          integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3">
-    <link rel="stylesheet" href="./css/KJFCux.css"
-          integrity="sha384-O+mnne/csN6seug8TlJ6t1LftNZ+QCWqXGLN0VdX4dP5JRvlVj35NVpvE0jhjoMn">
+          integrity="sha384-yEPZ7jP9S0QKiUQ0m3jjsO4ProIW7wvR9gXkI7JOGa2XVsw53Yke2bsdkBbjmmiX">
+    <link rel="stylesheet" href="./css/KJFCux.css">
 </head>
 <body>
 <div class="container">
@@ -226,7 +255,7 @@ if (isset($_COOKIE['invalid']) && $_COOKIE['invalid']) {
     <?php
     if ($saved) {
         ?>
-        <div class="card text-white bg-success">
+        <div class="card text-white bg-success mb-4">
             <div class="card-body">
                 Die Daten wurden erfolgreich gespeichert. Du kannst sie jederzeit über die aktuelle Seite aktualisieren.
                 Wir empfehlen daher diesen Link zu speichern, um später darauf zugreifen zu können.
@@ -236,18 +265,27 @@ if (isset($_COOKIE['invalid']) && $_COOKIE['invalid']) {
     }
     if ($invalid) {
         ?>
-        <div class="card text-white bg-danger">
+        <div class="card text-white bg-danger mb-4">
             <div class="card-body">
-                Achtung, Daten sind nicht valide. Bitte prüfe, ob alle Jahrgänge korrekt eingetragen sind.
+                Achtung, Daten sind nicht valide. Bitte prüfe, ob alle Geburtsdaten korrekt eingetragen sind.
             </div>
         </div>
         <?php
     }
-    if(isset($result_xlsx) && file_exists($result_xlsx)) {
+    if (!$registrationEnabled) {
+        ?>
+        <div class="card bg-light mb-4">
+            <div class="card-body">
+                Der Anmeldeschluss ist vorbei. Die Anmeldung kann nur noch angesehen, aber nicht mehr geändert werden.
+            </div>
+        </div>
+        <?php
+    }
+    if ($wertungsbogen !== null) {
         ?>
         <div class="card text-white bg-success mb-4">
             <div class="card-body">
-                <a href="<?php echo $result_xlsx; ?>" class="text-white">Hier kannst du den Wertungsbogen herunterladen.</a>
+                <a href="./?anmeldung=<?php echo e($datafile); ?>&amp;wertungsbogen=1" class="text-white">Hier kannst du den Wertungsbogen herunterladen.</a>
             </div>
         </div>
         <?php
@@ -258,32 +296,38 @@ if (isset($_COOKIE['invalid']) && $_COOKIE['invalid']) {
             <div class="col-sm-3">
                 <label for="Feuerwehr">Jugendfeuerwehr:</label>
                 <input type="text" class="form-control" name="Gruppe[Feuerwehr]" id="Feuerwehr"
-                       placeholder="Musterdorf"
-                       value="<?php echo_if_isset($XmlData['Feuerwehr']); ?>"
-                       required <?php echo_if_isset($XmlData['Feuerwehr'], 'readonly'); ?>>
+                       placeholder="Musterdorf" maxlength="64"
+                       value="<?php echo_if_isset($XmlData, 'Feuerwehr'); ?>"
+                       required <?php if ($gespeichert) { echo 'readonly'; } ?>>
             </div>
             <div class="col-sm-3">
                 <label for="GruppenName">Gruppenname:</label>
                 <input type="text" class="form-control" name="Gruppe[GruppenName]" id="GruppenName"
-                       placeholder="Musterdorf Blau"
-                       value="<?php echo_if_isset($XmlData['GruppenName']); ?>"
-                       required <?php echo_if_isset($XmlData['Feuerwehr'], 'readonly'); ?>>
+                       placeholder="Musterdorf Blau" maxlength="64"
+                       value="<?php echo_if_isset($XmlData, 'GruppenName'); ?>"
+                       required <?php if ($gespeichert) { echo 'readonly'; } ?>>
             </div>
             <div class="col-sm-3">
                 <label for="Organisationseinheit"><?php echo $config['organizationalunit']; ?></label>
-                <select class="form-control" name="Gruppe[Organisationseinheit]" id="Organisationseinheit"
-                        required <?php echo_if_isset($XmlData['Feuerwehr'], 'disabled'); ?>>
+                <select class="form-select" name="Gruppe[Organisationseinheit]" id="Organisationseinheit"
+                        required <?php if ($gespeichert) { echo 'disabled'; } ?>>
+                    <option value="">Bitte wählen</option>
                     <?php foreach ($config['organizationalunits'] as $unit): ?>
-                        <option value="<?php echo $unit; ?>" <?php echo (isset($XmlData['Organisationseinheit']) && $unit === $XmlData['Organisationseinheit']) ? 'selected' : ''; ?>><?php echo $unit; ?></option>
+                        <option value="<?php echo e($unit); ?>" <?php echo $unit === value($XmlData, 'Organisationseinheit') ? 'selected' : ''; ?>><?php echo e($unit); ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
             <div class="col-sm-3">
                 <label for="Email">E-Mail (optional):</label>
-                <input type="text" class="form-control" name="Email" id="Email" placeholder="Email@anbieter.de"
-                       data-bs-toggle="tooltip" data-bs-placement="right"
+                <input type="email" class="form-control" name="Email" id="Email" placeholder="Email@anbieter.de"
+                       autocomplete="email" data-bs-toggle="tooltip" data-bs-placement="right"
                        title="Wir senden dir einmalig einen Link zu dieser Anmeldung, damit du sie später ändern kannst. Deine E-Mail Adresse wird nicht gespeichert.">
             </div>
+        </div>
+        <!-- Spam-Schutz: für Menschen unsichtbar, wird nur von Bots ausgefüllt -->
+        <div class="hp-field" aria-hidden="true">
+            <label for="Homepage">Homepage</label>
+            <input type="text" name="Homepage" id="Homepage" tabindex="-1" autocomplete="off">
         </div>
         <div class="row mb-4">
             <div class="col-sm-12">
@@ -299,7 +343,7 @@ if (isset($_COOKIE['invalid']) && $_COOKIE['invalid']) {
             <div class="col-sm-12">
                 <p id="age-validation-message" class="text-danger"></p>
                 <div class="table-responsive">
-                    <table class="table">
+                    <table class="table align-middle">
                         <thead>
                         <tr>
                             <th>Nr.</th>
@@ -312,52 +356,40 @@ if (isset($_COOKIE['invalid']) && $_COOKIE['invalid']) {
                         </thead>
                         <tbody>
                         <?php
-                        $person = $XmlData['Persons'][0]['Person'];
-                        for ($i = 0; $i <= 9; $i++) {
-                            $person = $XmlData['Persons']['Person'][$i];
-
-                            $start = ($i + 1) . '.';
-                            $ageClass = 'age average';
-                            $required = 'required ';
-
-                            if ($i == 9) {
-                                $start = 'Ersatz';
-                                $ageClass = 'age';
-                                $required = '';
-                            }
+                        for ($i = 0; $i < ANZAHL_ZEILEN; $i++) {
+                            $person = is_array($personen[$i] ?? null) ? $personen[$i] : [];
+                            $ersatz = $i === ANZAHL_ZEILEN - 1;
+                            $required = $ersatz ? '' : 'required';
+                            $geburtsdatum = if_isset_dt($person, 'Geburtsdatum');
                             ?>
-                            <tr>
-                                <td><?php echo $start; ?></td>
+                            <tr<?php echo $ersatz ? ' class="ersatz"' : ''; ?>>
+                                <td><?php echo $ersatz ? 'Ersatz' : ($i + 1) . '.'; ?></td>
                                 <td>
-                                    <input name="Persons[Vorname][]" type="text" class="form-control"
-                                           placeholder="Vorname"
-                                        <?php echo $required; ?> value="<?php echo_if_isset($person['Vorname']); ?>">
+                                    <input name="Persons[Vorname][]" type="text" class="form-control vorname"
+                                           placeholder="Vorname" aria-label="Vorname" maxlength="64" <?php echo $required; ?>
+                                           value="<?php echo_if_isset($person, 'Vorname'); ?>">
                                 </td>
                                 <td>
-                                    <input name="Persons[Nachname][]" type="text" class="form-control"
-                                           placeholder="Nachname" <?php echo $required; ?>
-                                           value="<?php echo_if_isset($person['Nachname']); ?>">
+                                    <input name="Persons[Nachname][]" type="text" class="form-control nachname"
+                                           placeholder="Nachname" aria-label="Nachname" maxlength="64" <?php echo $required; ?>
+                                           value="<?php echo_if_isset($person, 'Nachname'); ?>">
                                 </td>
                                 <td>
-                                    <select name="Persons[Geschlecht][]" class="form-control">
-                                        <option value="D" <?php echo isset($person['Geschlecht']) && $person['Geschlecht'] == 'D' ? 'selected' : '' ?>>
-                                            D
-                                        </option>
-                                        <option value="M" <?php echo isset($person['Geschlecht']) && $person['Geschlecht'] == 'M' ? 'selected' : '' ?>>
-                                            M
-                                        </option>
-                                        <option value="W" <?php echo isset($person['Geschlecht']) && $person['Geschlecht'] == 'W' ? 'selected' : '' ?>>
-                                            W
-                                        </option>
+                                    <select name="Persons[Geschlecht][]" class="form-select geschlecht" aria-label="Geschlecht" <?php echo $required; ?>>
+                                        <option value="">Bitte wählen</option>
+                                        <?php foreach (GESCHLECHT_OPTIONEN as $option): ?>
+                                            <option value="<?php echo $option; ?>" <?php echo value($person, 'Geschlecht') === $option ? 'selected' : ''; ?>><?php echo $option; ?></option>
+                                        <?php endforeach; ?>
                                     </select>
                                 </td>
                                 <td>
-                                    <input name="Persons[Geburtsdatum][]" type="text"
-                                           class="form-control Geburtsdatum<?php echo (if_isset_dt($person['Geburtsdatum']) == '01.01.0001') ? ' error' : ''; ?>"
-                                           placeholder="TT.MM.JJJJ" <?php echo $required; ?>
-                                           value="<?php echo if_isset_dt($person['Geburtsdatum']); ?>">
+                                    <input name="Persons[Geburtsdatum][]" type="date"
+                                           class="form-control Geburtsdatum<?php echo $geburtsdatum === UNGUELTIGES_DATUM ? ' error' : ''; ?>"
+                                           aria-label="Geburtsdatum" <?php echo $required; ?>
+                                           min="<?php echo $minDate->format('Y-m-d'); ?>" max="<?php echo $allowDate->format('Y-m-d'); ?>"
+                                           value="<?php echo e($geburtsdatum); ?>">
                                 </td>
-                                <td class="<?php echo $ageClass; ?>"></td>
+                                <td class="age<?php echo $ersatz ? '' : ' average'; ?>"></td>
                             </tr>
                             <?php
                         }
@@ -369,23 +401,21 @@ if (isset($_COOKIE['invalid']) && $_COOKIE['invalid']) {
         </div>
         <div class="row">
             <div class="col-sm">
-                <p>Gesamtalter: <span id="total-age">0</span> : 9 = <span id="average">0</span></p>
-                <p>Die Berechnung der Alter erfolgt anhand des Geburtsjahrgangs.</p>
+                <p>Gesamtalter: <span id="total-age">0</span> : <span id="age-count">0</span> = <span id="average">0</span></p>
+                <p>Die Berechnung der Alter erfolgt anhand des Geburtsjahrgangs. Der Ersatz wird nicht mitgerechnet.</p>
             </div>
-            <?php if($registrationEnabled){ ?>
+            <?php if ($registrationEnabled) { ?>
             <div class="col-sm text-center">
                 <button class="btn btn-primary" type="submit">Anmeldung übermitteln</button>
             </div>
             <?php } ?>
         </div>
     </form>
-    <span id="eventdate" hidden><?php echo $config['eventdate']; ?></span>
 </div>
+<div id="settings" hidden data-eventdate="<?php echo $eventDate->format('Y-m-d'); ?>"
+     data-min-age="<?php echo MINDESTALTER; ?>" data-max-age="<?php echo HOECHSTALTER; ?>"></div>
 <script src="./js/bootstrap.bundle.min.js"
-        integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p"></script>
-<script src="./js/KJFCux.js"
-        integrity="sha384-QbaHC+Eb61iElgkVWOguJB/AYCo+3+V9lIYoKmNiXWJti84T4XMJ30tBgNRlDeGs"></script>
+        integrity="sha384-WyOxWvTyr1QaMPfiPJSv76iReVthorl5uWlFtZPyK0IEB0hGzo9y5Bp9mYanr8Bu"></script>
+<script src="./js/KJFCux.js"></script>
 </body>
 </html>
-
-

@@ -2,7 +2,7 @@
   "name": "kjfcux/jf-bundeswettbewerb-anmeldung",
   "description": "Webanwendung um Anmeldungen für die Auswertungssoftware für den Bundeswettbewerb der deutschen Jugendfeuerwehr entgegen zu nehmen",
   "minimum-stability": "stable",
-  "license": "GNU Affero General Public License v3.0",
+  "license": "AGPL-3.0-or-later",
   "authors": [
     {
       "name": "Yannik Eichel",
@@ -10,8 +10,10 @@
     }
   ],
   "require": {
+    "php": ">=7.4",
     "ext-mbstring": "*",
     "ext-simplexml": "*",
-    "ext-dom": "*"
+    "ext-dom": "*",
+    "ext-json": "*"
   }
 }
