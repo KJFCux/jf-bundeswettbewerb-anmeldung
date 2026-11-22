@@ -1,7 +1,21 @@
-// Wandelt ein Datum im Format TT.MM.JJJJ in ein Date-Objekt um
+// Wandelt ein Datum im Format JJJJ-MM-TT (Datumsfeld) oder TT.MM.JJJJ (ältere Browser)
+// in ein Date-Objekt um. Liefert null bei ungültigen Daten wie dem 31.02.
 function parseDate(value) {
-    const parts = value.split('.');
-    return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
+    let match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    let year, month, day;
+    if (match) {
+        [year, month, day] = [match[1], match[2], match[3]].map(Number);
+    } else if ((match = value.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/))) {
+        [day, month, year] = [match[1], match[2], match[3]].map(Number);
+    } else {
+        return null;
+    }
+    const date = new Date(year, month - 1, day);
+    // Date springt bei ungültigen Tagen in den nächsten Monat
+    if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+        return null;
+    }
+    return date;
 }
 
 document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (element) {
@@ -20,7 +34,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const totalAge = document.querySelector('#total-age');
     const ageCount = document.querySelector('#age-count');
     const totalAverage = document.querySelector('#average');
-    const dateRegex = /^(0?[1-9]|[12][0-9]|3[01])\.(0?[1-9]|1[012])\.((19|20)\d\d)$/;
 
     // Ersatz: Geschlecht und Geburtsdatum sind Pflicht, sobald ein Name eingetragen ist
     const ersatz = document.querySelector('tr.ersatz');
@@ -40,14 +53,19 @@ document.addEventListener('DOMContentLoaded', function () {
         ageCell.textContent = '';
 
         const value = element.value.trim();
-        if (value === '') return '';
+        // Unvollständige Eingaben liefert das Datumsfeld als leeren Wert
+        if (value === '') {
+            if (element.validity.badInput) {
+                element.classList.add('error');
+                return 'Bitte gib ein vollständiges Geburtsdatum ein.';
+            }
+            return '';
+        }
 
-        const match = value.match(dateRegex);
-        const birthday = match ? parseDate(value) : null;
-        // Ungültige Tage wie 31.02. erkennen (Date springt sonst in den nächsten Monat)
-        if (!birthday || birthday.getDate() !== parseInt(match[1], 10) || birthday.getMonth() !== parseInt(match[2], 10) - 1) {
+        const birthday = parseDate(value);
+        if (!birthday || birthday.getFullYear() < 1900) {
             element.classList.add('error');
-            return 'Bitte gib ein gültiges Geburtsdatum im Format TT.MM.JJJJ ein.';
+            return 'Bitte gib ein gültiges Geburtsdatum ein.';
         }
 
         // Alter anhand des Geburtsjahrgangs
@@ -96,6 +114,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     birthdays.forEach(function (element) {
         element.addEventListener('change', validate);
+        element.addEventListener('blur', validate);
     });
     if (ersatz) {
         ersatz.querySelectorAll('.vorname, .nachname').forEach(function (element) {

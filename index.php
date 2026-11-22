@@ -8,6 +8,7 @@ if (file_exists('config.php')) {
 } else {
     die('Config not found, please copy config.sample.php to config.php and configure values');
 }
+require __DIR__ . '/inc/functions.php';
 
 // Erlaubte Werte für das Geschlecht
 const GESCHLECHT_OPTIONEN = ['D', 'M', 'W'];
@@ -17,8 +18,13 @@ const ANZAHL_ZEILEN = ANZAHL_TEILNEHMENDE + 1;
 // Mindest- und Höchstalter (berechnet über den Geburtsjahrgang)
 const MINDESTALTER = 10;
 const HOECHSTALTER = 18;
-// Verzeichnis der Wertungsbögen (Dateiname: <Schlüssel>.xlsx)
-const WERTUNGSBOGEN_DIR = './xml/Wertungsbögen/';
+// Ablageorte (alle unterhalb von xml/, das per .htaccess gesperrt ist)
+const XML_DIR = __DIR__ . '/xml/';
+const VERLAUF_DIR = XML_DIR . 'Verlauf/';
+const WERTUNGSBOGEN_DIR = XML_DIR . 'Wertungsbögen/';
+const RATELIMIT_DIR = XML_DIR . '.ratelimit';
+// Markierung für ungültige Geburtsdaten (DateTime.MinValue in C#)
+const UNGUELTIGES_DATUM = '0001-01-01';
 
 $eventDate = DateTimeImmutable::createFromFormat('!d.m.Y', $config['eventdate']);
 if ($eventDate === false) {
@@ -26,6 +32,8 @@ if ($eventDate === false) {
 }
 // Wer nach diesem Tag geboren ist, ist am Veranstaltungstag jünger als das Mindestalter
 $allowDate = $eventDate->modify('-' . MINDESTALTER . ' year');
+// Ältester erlaubter Jahrgang
+$minDate = $eventDate->setDate((int)$eventDate->format('Y') - HOECHSTALTER, 1, 1);
 
 $registrationEnabled = true;
 try {
@@ -39,40 +47,20 @@ try {
     die('block_registration_at in config.php is not a valid date');
 }
 
-function generateRandomString($length = 10): string
-{
-    $characters = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    $charactersLength = strlen($characters);
-    $randomString = '';
-    for ($i = 0; $i < $length; $i++) {
-        $randomString .= $characters[random_int(0, $charactersLength - 1)];
-    }
-    return $randomString;
-}
-
-function e($value): string
-{
-    return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
-}
-
 /**
- * Liefert einen Wert aus den eingelesenen XML-Daten als String.
- * Leere XML-Elemente werden von json_encode() als leeres Array geliefert.
+ * Wandelt ein Geburtsdatum aus dem Formular in ein Datum um.
+ * Akzeptiert JJJJ-MM-TT (Datumsfeld) und TT.MM.JJJJ (ältere Browser).
  */
-function value($array, $key): string
+function parseGeburtsdatum(string $value): ?DateTime
 {
-    if (!is_array($array) || !isset($array[$key]) || is_array($array[$key])) {
-        return '';
+    foreach (['!Y-m-d', '!d.m.Y'] as $format) {
+        $date = DateTime::createFromFormat($format, $value);
+        $errors = DateTime::getLastErrors();
+        if ($date !== false && empty($errors['warning_count']) && empty($errors['error_count'])) {
+            return $date;
+        }
     }
-    return (string)$array[$key];
-}
-
-function echo_if_isset($array, $key, $echo = null): void
-{
-    $value = value($array, $key);
-    if ($value !== '') {
-        echo $echo ?? e($value);
-    }
+    return null;
 }
 
 function if_isset_dt($array, $key): string
@@ -82,50 +70,22 @@ function if_isset_dt($array, $key): string
         return '';
     }
     $timestamp = strtotime($value);
-    return $timestamp === false ? '' : date('d.m.Y', $timestamp);
-}
-
-function input($string, $len = 64): string
-{
-    if (!is_string($string)) {
-        return '';
-    }
-    return mb_strimwidth(trim($string), 0, $len);
-}
-
-/**
- * Erzeugt ein XML-Element mit Textinhalt. createElement($name, $value) escaped
- * "&" nicht, wodurch Werte wie "Musterdorf & Umgebung" leer gespeichert wurden.
- */
-function xmlElement(DOMDocument $xml, string $name, string $value = ''): DOMElement
-{
-    $element = $xml->createElement($name);
-    if ($value !== '') {
-        $element->appendChild($xml->createTextNode($value));
-    }
-    return $element;
-}
-
-function mailSubject(string $subject): string
-{
-    return mb_encode_mimeheader($subject, 'UTF-8', 'B');
+    return $timestamp === false ? '' : date('Y-m-d', $timestamp);
 }
 
 $XmlData = [];
 $datafile = null;
-$old_xml = null;
+$gespeichert = false;
 $wertungsbogen = null;
-if (isset($_GET['anmeldung']) && is_string($_GET['anmeldung']) && ctype_alnum($_GET['anmeldung']) && file_exists('./xml/' . $_GET['anmeldung'] . '.xml')) {
-    $old_xml = simplexml_load_file('./xml/' . $_GET['anmeldung'] . '.xml');
-    if ($old_xml) {
-        //Convert SimpleXml Object to associative Array
-        $XmlData = json_decode(json_encode($old_xml), true);
+if (isset($_GET['anmeldung']) && is_string($_GET['anmeldung']) && ctype_alnum($_GET['anmeldung']) && file_exists(XML_DIR . $_GET['anmeldung'] . '.xml')) {
+    $geladen = loadXmlData(XML_DIR . $_GET['anmeldung'] . '.xml');
+    if ($geladen !== null) {
+        $XmlData = $geladen;
         $datafile = $_GET['anmeldung'];
+        $gespeichert = true;
         if (file_exists(WERTUNGSBOGEN_DIR . $datafile . '.xlsx')) {
             $wertungsbogen = WERTUNGSBOGEN_DIR . $datafile . '.xlsx';
         }
-    } else {
-        $old_xml = null;
     }
 }
 
@@ -144,17 +104,22 @@ if (isset($_GET['wertungsbogen'])) {
     exit;
 }
 
-// Bei nur einer Person liefert SimpleXML/JSON kein Array von Personen, sondern
-// direkt die Person. Das wird hier vereinheitlicht.
-$personen = $XmlData['Persons']['Person'] ?? [];
-if (!is_array($personen)) {
-    $personen = [];
-} elseif ($personen !== [] && !isset($personen[0])) {
-    $personen = [$personen];
-}
+$personen = asList($XmlData['Persons']['Person'] ?? []);
 
 if (isset($_POST['Gruppe']['Feuerwehr'], $_POST['Gruppe']['GruppenName'], $_POST['Persons']['Vorname'])
     && is_array($_POST['Persons']['Vorname'])) {
+
+    // Spam-Schutz: Das Feld "Homepage" ist für Menschen unsichtbar und wird nur von Bots ausgefüllt.
+    // Der Bot bekommt eine scheinbar erfolgreiche Antwort, gespeichert wird nichts.
+    if (!empty($_POST['Homepage'])) {
+        header('Location: ./');
+        exit;
+    }
+    // Neue Anmeldungen pro IP-Adresse begrenzen
+    if (!$gespeichert && !rateLimit(RATELIMIT_DIR, 'anmeldung', (int)($config['ratelimit_registrations'] ?? 10))) {
+        http_response_code(429);
+        die('Von deinem Anschluss wurden in der letzten Stunde zu viele Anmeldungen angelegt. Bitte versuche es später erneut.');
+    }
 
     // XML-Daten aufbauen
     $xml = new DOMDocument("1.0", "utf-16");
@@ -163,7 +128,7 @@ if (isset($_POST['Gruppe']['Feuerwehr'], $_POST['Gruppe']['GruppenName'], $_POST
     $gruppe = $xml->createElement("Gruppe");
     $xml->appendChild($gruppe);
 
-    if ($old_xml === null) {
+    if (!$gespeichert) {
         // Feuerwehr, GruppenName, Organisationseinheit
         $organisationseinheit = input($_POST['Gruppe']['Organisationseinheit'] ?? '');
         if (!in_array($organisationseinheit, $config['organizationalunits'], true)) {
@@ -209,12 +174,10 @@ if (isset($_POST['Gruppe']['Feuerwehr'], $_POST['Gruppe']['GruppenName'], $_POST
         $person->appendChild(xmlElement($xml, "Geschlecht", $geschlecht));
 
         // Geburtsdatum prüfen und in das Format YYYY-MM-DDTHH:MM:SS konvertieren
-        $date = DateTime::createFromFormat('!d.m.Y', input($post['Geburtsdatum'][$index] ?? '', 10));
-        $errors = DateTime::getLastErrors();
+        $date = parseGeburtsdatum(input($post['Geburtsdatum'][$index] ?? '', 10));
         $alter = $date ? (int)$eventDate->format('Y') - (int)$date->format('Y') : null;
-        if (!$date || !empty($errors['warning_count']) || $allowDate < $date
-            || $alter < MINDESTALTER || $alter > HOECHSTALTER) {
-            $date = new DateTime("0001-01-01 00:00:00"); //C# min value
+        if (!$date || $allowDate < $date || $alter < MINDESTALTER || $alter > HOECHSTALTER) {
+            $date = new DateTime(UNGUELTIGES_DATUM);
             $invalid = true;
         }
         $person->appendChild(xmlElement($xml, "Geburtsdatum", $date->format("Y-m-d\TH:i:s")));
@@ -230,13 +193,19 @@ if (isset($_POST['Gruppe']['Feuerwehr'], $_POST['Gruppe']['GruppenName'], $_POST
     $gruppe->appendChild(xmlElement($xml, "TimeStampAenderung", (new DateTime())->format("Y-m-d\TH:i:s")));
 
     $xml->formatOutput = true;
-    if ($xml->save('./xml/' . $datafile . '.xml') === false) {
+    if ($xml->save(XML_DIR . $datafile . '.xml') === false) {
         http_response_code(500);
         die('Die Anmeldung konnte nicht gespeichert werden. Bitte wende dich an die Veranstaltungsleitung.');
     }
+    // Jeden Stand zusätzlich im Verlauf sichern (Unterordner, damit der Import keine Duplikate sieht)
+    if (($config['history'] ?? true) && (is_dir(VERLAUF_DIR) || @mkdir(VERLAUF_DIR, 0770, true))) {
+        $xml->save(VERLAUF_DIR . $datafile . '_' . (new DateTime())->format('Ymd-His-v') . '.xml');
+    }
 
+    // Link per E-Mail senden (begrenzt pro IP-Adresse, damit das Formular nicht zum Spam-Versand taugt)
     $email = trim((string)($_POST['Email'] ?? ''));
-    if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)
+        && rateLimit(RATELIMIT_DIR, 'mail', (int)($config['ratelimit_mails'] ?? 5))) {
         $message = str_replace('{URL}', $url, $config['mailmessage']);
         $header = 'From: ' . $config['mailabsender'] . "\r\n" . 'Content-Type: text/plain; charset=utf-8';
         mail($email, mailSubject('Anmeldung zum ' . strip_tags($config['description'])), $message, $header);
@@ -259,7 +228,6 @@ if (!empty($_COOKIE['invalid'])) {
     $invalid = true;
     setcookie("invalid", "", time() - 1000);
 }
-$gespeichert = $old_xml !== null;
 ?>
 <!DOCTYPE html>
 <html lang="de">
@@ -269,7 +237,7 @@ $gespeichert = $old_xml !== null;
     <meta name="robots" content="noindex, nofollow">
     <title><?php echo $config['title']; ?></title>
     <link rel="stylesheet" href="./css/bootstrap.min.css"
-          integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3">
+          integrity="sha384-yEPZ7jP9S0QKiUQ0m3jjsO4ProIW7wvR9gXkI7JOGa2XVsw53Yke2bsdkBbjmmiX">
     <link rel="stylesheet" href="./css/KJFCux.css">
 </head>
 <body>
@@ -356,6 +324,11 @@ $gespeichert = $old_xml !== null;
                        title="Wir senden dir einmalig einen Link zu dieser Anmeldung, damit du sie später ändern kannst. Deine E-Mail Adresse wird nicht gespeichert.">
             </div>
         </div>
+        <!-- Spam-Schutz: für Menschen unsichtbar, wird nur von Bots ausgefüllt -->
+        <div class="hp-field" aria-hidden="true">
+            <label for="Homepage">Homepage</label>
+            <input type="text" name="Homepage" id="Homepage" tabindex="-1" autocomplete="off">
+        </div>
         <div class="row mb-4">
             <div class="col-sm-12">
                 <p><?php echo $config['description']; ?></p>
@@ -410,9 +383,10 @@ $gespeichert = $old_xml !== null;
                                     </select>
                                 </td>
                                 <td>
-                                    <input name="Persons[Geburtsdatum][]" type="text" inputmode="numeric"
-                                           class="form-control Geburtsdatum<?php echo $geburtsdatum === '01.01.0001' ? ' error' : ''; ?>"
-                                           placeholder="TT.MM.JJJJ" aria-label="Geburtsdatum" maxlength="10" <?php echo $required; ?>
+                                    <input name="Persons[Geburtsdatum][]" type="date"
+                                           class="form-control Geburtsdatum<?php echo $geburtsdatum === UNGUELTIGES_DATUM ? ' error' : ''; ?>"
+                                           aria-label="Geburtsdatum" <?php echo $required; ?>
+                                           min="<?php echo $minDate->format('Y-m-d'); ?>" max="<?php echo $allowDate->format('Y-m-d'); ?>"
                                            value="<?php echo e($geburtsdatum); ?>">
                                 </td>
                                 <td class="age<?php echo $ersatz ? '' : ' average'; ?>"></td>
@@ -438,10 +412,10 @@ $gespeichert = $old_xml !== null;
         </div>
     </form>
 </div>
-<div id="settings" hidden data-eventdate="<?php echo e($config['eventdate']); ?>"
+<div id="settings" hidden data-eventdate="<?php echo $eventDate->format('Y-m-d'); ?>"
      data-min-age="<?php echo MINDESTALTER; ?>" data-max-age="<?php echo HOECHSTALTER; ?>"></div>
 <script src="./js/bootstrap.bundle.min.js"
-        integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p"></script>
+        integrity="sha384-WyOxWvTyr1QaMPfiPJSv76iReVthorl5uWlFtZPyK0IEB0hGzo9y5Bp9mYanr8Bu"></script>
 <script src="./js/KJFCux.js"></script>
 </body>
 </html>

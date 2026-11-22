@@ -27,3 +27,10 @@ $config['mailabsender'] = 'mail@example.net';
 $config['url'] = 'https://example.net/anmeldung/';
 // Text der E-Mail mit dem Link zur Anmeldung. {URL} = Link zur Anmeldung
 $config['mailmessage'] = "Hallo, du kannst deine Anmeldung unter dieser URL einsehen: \r\n\r\n{URL} \r\n\r\nViele Grüße";
+
+// Jeden gespeicherten Stand zusätzlich in xml/Verlauf/ sichern (true/false)
+$config['history'] = true;
+
+// Spam-Schutz: höchstens so viele neue Anmeldungen bzw. E-Mails pro IP-Adresse und Stunde (0 = unbegrenzt)
+$config['ratelimit_registrations'] = 10;
+$config['ratelimit_mails'] = 5;

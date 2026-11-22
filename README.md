@@ -15,6 +15,8 @@ gespeichert und lassen sich in die [JF Bundeswettbewerbs-Software](https://githu
 - Altersprüfung im Browser und auf dem Server, Anzeige von Gesamtalter und Durchschnittsalter
 - Anmeldeschluss: Danach ist die Anmeldung nur noch lesbar
 - Download des Wertungsbogens nach dem Wettbewerb über denselben Link
+- Verlauf: Jeder gespeicherte Stand wird zusätzlich gesichert
+- Spam-Schutz durch ein unsichtbares Honeypot-Feld und eine Begrenzung pro IP-Adresse
 
 ## Voraussetzungen
 
@@ -51,6 +53,9 @@ Alle Einstellungen stehen in der `config.php`:
 | `mailabsender` | Absenderadresse der E-Mail |
 | `url` | Öffentliche URL der Anwendung mit abschließendem `/`, wird für den Link in der E-Mail und in der XML-Datei verwendet |
 | `mailmessage` | Text der E-Mail. Platzhalter: `{URL}` = Link zur Anmeldung |
+| `history` | Jeden gespeicherten Stand zusätzlich in `xml/Verlauf/` sichern (Standard: `true`) |
+| `ratelimit_registrations` | Höchstzahl neuer Anmeldungen pro IP-Adresse und Stunde (Standard: `10`, `0` = unbegrenzt) |
+| `ratelimit_mails` | Höchstzahl versendeter E-Mails pro IP-Adresse und Stunde (Standard: `5`, `0` = unbegrenzt) |
 
 `title`, `headline`, `description` und `organizationalunit` werden ungefiltert als HTML ausgegeben.
 Dort nur vertrauenswürdige Inhalte eintragen.
@@ -68,20 +73,25 @@ Das Alter wird – wie in der Wettbewerbsordnung – über den Geburtsjahrgang b
 - Gesamt- und Durchschnittsalter werden aus den neun Teilnehmenden berechnet, der Ersatz zählt nicht mit.
 
 Die Grenzen stehen als Konstanten `MINDESTALTER` und `HOECHSTALTER` am Anfang der `index.php`.
-Ungültige Geburtsdaten werden trotzdem gespeichert, aber als `0001-01-01` markiert. Die Gruppe sieht dann einen
-Hinweis und das betroffene Feld wird rot hervorgehoben.
+Das Geburtsdatum wird über ein Datumsfeld des Browsers eingegeben, das nur Daten im erlaubten Bereich zulässt.
+Sollte trotzdem ein ungültiges Geburtsdatum ankommen (z. B. aus einem sehr alten Browser), wird die Anmeldung
+gespeichert, das Datum aber als `0001-01-01` markiert. Die Gruppe sieht dann einen Hinweis und das betroffene Feld
+wird rot hervorgehoben.
 
 ## Ablauf und Datenablage
 
 - Bei der ersten Anmeldung wird ein zufälliger 48-stelliger Schlüssel erzeugt. Die Daten liegen in `xml/<Schlüssel>.xml`.
 - Jugendfeuerwehr, Gruppenname und Organisationseinheit lassen sich nach der ersten Anmeldung nicht mehr ändern.
 - Leere Zeilen (z. B. kein Ersatz) werden nicht gespeichert.
+- Jeder gespeicherte Stand wird zusätzlich als `xml/Verlauf/<Schlüssel>_<JJJJMMTT-hhmmss-ms>.xml` abgelegt
+  (abschaltbar über `history`). So lässt sich bei Rückfragen nachvollziehen, wer wann was geändert hat.
 - Die XML-Dateien sind UTF-16-kodiert, Geburtsdaten z. B. als `2012-01-31T00:00:00`.
 - Nach dem Anmeldeschluss (`block_registration_at`) können Anmeldungen weiterhin angesehen, aber nicht mehr gespeichert werden.
 
 ## Import in die Bundeswettbewerbs-Software
 
-Nach dem Anmeldeschluss bzw. am Tag des Wettbewerbs alle Dateien aus `xml/` herunterladen und in die
+Nach dem Anmeldeschluss bzw. am Tag des Wettbewerbs alle `*.xml`-Dateien direkt aus `xml/` herunterladen
+(**ohne** die Unterordner `Verlauf/` und `Wertungsbögen/`) und in die
 [JF Bundeswettbewerbs-Software](https://github.com/KJFCux/jf-bundeswettbewerb) importieren. Dort werden alle Gruppen
 angelegt und der Wettbewerb kann gestartet werden.
 
@@ -103,11 +113,11 @@ ausgeliefert, das Verzeichnis `xml/` bleibt für direkte Zugriffe gesperrt.
 Die Anwendung verarbeitet personenbezogene Daten von Kindern und Jugendlichen (Name, Geburtsdatum, Geschlecht).
 Bitte beachte:
 
-- **Das Verzeichnis `xml/` darf nicht über den Webserver abrufbar sein.** Für Apache liegt dafür eine
-  `xml/.htaccess` bei. Bei nginx muss der Zugriff in der Serverkonfiguration gesperrt werden:
+- **Die Verzeichnisse `xml/` und `inc/` dürfen nicht über den Webserver abrufbar sein.** Für Apache liegt
+  dafür jeweils eine `.htaccess` bei. Bei nginx muss der Zugriff in der Serverkonfiguration gesperrt werden:
 
   ```nginx
-  location ~ ^/anmeldung/(xml/|\.) {
+  location ~ ^/anmeldung/(xml/|inc/|\.) {
       deny all;
   }
   ```
@@ -116,7 +126,10 @@ Bitte beachte:
   jeweils Verantwortlichen weitergegeben werden. Die `.htaccess` setzt `Referrer-Policy: no-referrer`
   und `X-Robots-Tag: noindex`, damit die Links nicht an Dritte gelangen oder in Suchmaschinen erscheinen.
 - Die Anwendung nur über HTTPS betreiben.
-- Die XML-Dateien und Wertungsbögen nach Abschluss der Veranstaltung gemäß eurem Löschkonzept entfernen.
+- Die XML-Dateien, den Verlauf und die Wertungsbögen nach Abschluss der Veranstaltung gemäß eurem
+  Löschkonzept entfernen.
+- Für den Spam-Schutz wird in `xml/.ratelimit/` ein gesalzener Hash der IP-Adresse mit den Zeitpunkten der
+  letzten Anmeldungen bzw. E-Mails gespeichert. Die Einträge werden nach einer Stunde verworfen und regelmäßig gelöscht.
 - Die Dateien in `xml/` sind über `.gitignore` von der Versionsverwaltung ausgeschlossen und dürfen nie committet werden.
 
 ## Lokale Entwicklung
@@ -129,7 +142,26 @@ php -S localhost:8000
 Danach ist die Anwendung unter <http://localhost:8000> erreichbar. Der PHP-Entwicklungsserver wertet keine
 `.htaccess` aus, `xml/` ist dort also direkt abrufbar. E-Mails werden lokal nur verschickt, wenn `sendmail` eingerichtet ist.
 
-Verwendete Bibliotheken: [Bootstrap 5.1.3](https://getbootstrap.com/) (lokal in `css/` und `js/` eingebunden).
+### Aufbau
+
+| Datei/Verzeichnis | Inhalt |
+|---|---|
+| `index.php` | Formular, Prüfung und Speicherung der Anmeldung |
+| `inc/functions.php` | Allgemeine Hilfsfunktionen (XML, E-Mail, Spam-Schutz), unabhängig vom Formular |
+| `js/KJFCux.js` | Altersberechnung und Prüfung im Browser |
+| `css/KJFCux.css` | Eigene Styles |
+| `xml/` | Anmeldungen, Verlauf, Wertungsbögen und Spam-Schutz-Zähler (nicht öffentlich) |
+
+### Bootstrap aktualisieren
+
+Verwendet wird [Bootstrap 5.3.9](https://getbootstrap.com/), lokal in `css/` und `js/` eingebunden. Für ein Update
+`bootstrap.min.css` und `bootstrap.bundle.min.js` (jeweils mit `.map`) aus dem `dist`-Ordner des
+[npm-Pakets](https://www.npmjs.com/package/bootstrap) ersetzen und die `integrity`-Hashes in der `index.php` anpassen:
+
+```bash
+openssl dgst -sha384 -binary css/bootstrap.min.css | openssl base64 -A
+openssl dgst -sha384 -binary js/bootstrap.bundle.min.js | openssl base64 -A
+```
 
 ## Lizenz
 

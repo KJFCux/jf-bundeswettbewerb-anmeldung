@@ -81,3 +81,5 @@ config.php
 # Anmeldedaten und Wertungsbögen (personenbezogene Daten) niemals committen
 xml/*.xml
 xml/Wertungsbögen/
+xml/Verlauf/
+xml/.ratelimit/
